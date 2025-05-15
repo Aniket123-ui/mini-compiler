@@ -1,28 +1,26 @@
-# Efficient Mini Compiler for Code Optimization and Syntax Analysis
+# Mini Compiler
 
-A lightweight compiler implementation that supports a subset of C language features with optimization capabilities.
+## Project Overview
+A compact yet powerful compiler implementation written in C that demonstrates fundamental compiler construction concepts. This project implements a complete compilation pipeline including lexical analysis, parsing, semantic analysis, optimization, and code generation.
 
-## Features
-- Lexical analysis (tokenization)
-- Syntax analysis (parsing)
-- Intermediate code generation (Three Address Code)
-- Basic optimizations (constant folding, dead code elimination)
-- Error handling with line number reporting
+### Key Components
+- Lexical Analyzer (Lexer)
+- Parser with AST Generation
+- Semantic Analyzer
+- IR Optimizer
+- Assembly Code Generator
+- Test Framework
 
-## Supported Language Features
-- Variable declarations
-- Arithmetic expressions
-- Assignment statements
-- Conditional statements (if-else)
-- Loops (while)
-- Basic data types (int)
+## Installation Instructions
 
-## Prerequisites
-- GCC compiler
-- Flex (lexical analyzer generator)
-- Bison (parser generator)
-- Make
+### Prerequisites
+- C Compiler (GCC recommended)
+- Make build system
+- Unix-like environment (or Windows with appropriate build tools)
 
-## Building the Project
+### Build Steps
+1. Clone the repository
+2. Navigate to the project directory
+3. Run make to build the project:
 ```bash
 make

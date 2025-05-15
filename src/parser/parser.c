@@ -1,4 +1,6 @@
 #include "parser.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 Parser* create_parser(Lexer* lexer) {
     Parser* parser = (Parser*)malloc(sizeof(Parser));
