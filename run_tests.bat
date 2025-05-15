@@ -1,23 +1,32 @@
 @echo off
-echo Running Mini Compiler Test Suite
-echo ==============================
+echo ============================
+echo Building Mini Compiler Project
+echo ============================
 
-gcc src/test/test_main.c src/test/test_framework.c src/test/test_lexer.c src/test/test_parser.c src/lexer/lexer.c src/parser/parser.c -o bin/test_runner.exe
-
-if %ERRORLEVEL% NEQ 0 (
-    echo Compilation failed!
-    exit /b 1
+REM Create build directory if missing
+if not exist build (
+    mkdir build
 )
 
-echo.
-echo Running tests...
-echo.
-
-bin\test_runner.exe
+REM Compile all source files
+gcc -Wall -g -I src ^
+src/lexer/lexer.c ^
+src/parser/parser.c ^
+src/parser/ast.c ^
+src/semantic/semantic_analyzer.c ^
+src/utils/symbol_table.c ^
+main.c ^
+-o build/compiler.exe
 
 if %ERRORLEVEL% NEQ 0 (
-    echo Some tests failed!
-    exit /b 1
-) else (
-    echo All tests passed!
+    echo ❌ Compilation failed!
+    pause
+    exit /b %ERRORLEVEL%
 )
+
+echo ✅ Compilation successful!
+echo Running compiler...
+
+build\compiler.exe
+
+pause

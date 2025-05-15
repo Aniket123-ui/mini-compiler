@@ -1,34 +1,22 @@
-#include "interpreter.h"
-
-#define MAX_INPUT 1024
+#include "parser/ast.h"
+#include<stdlib.h>
+#include <stdio.h>
 
 int main() {
-    char input[MAX_INPUT];
+    Token* tok = malloc(sizeof(Token));
+    tok->type = TOKEN_NUMBER;
+    tok->value = "42";
+    tok->line = 1;
+    tok->column = 5;
 
-    while (1) {
-        printf("calc> ");
-        if (fgets(input, MAX_INPUT, stdin) == NULL) {
-            break;
-        }
+    ASTNode* num_node = create_number_node(42, tok);
 
-        // Remove newline
-        input[strcspn(input, "\n")] = 0;
+    printf("Node type: %d\n", num_node->type);
+    printf("Value: %d\n", num_node->value);
+    printf("Token: %s at line %d\n", num_node->token->value, num_node->token->line);
 
-        if (strlen(input) == 0) {
-            continue;
-        }
-
-        Lexer* lexer = create_lexer(input);
-        Parser* parser = create_parser(lexer);
-        Interpreter* interpreter = create_interpreter(parser);
-
-        int result = interpret(interpreter);
-        printf("%d\n", result);
-
-        free_interpreter(interpreter);
-        free_parser(parser);
-        free_lexer(lexer);
-    }
+    free(num_node->token);
+    free(num_node);
 
     return 0;
 }

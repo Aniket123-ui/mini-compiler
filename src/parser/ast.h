@@ -2,7 +2,8 @@
 #define AST_H
 
 #include <stdbool.h>
-#include "token.h"  // You must have a token struct for source tracking
+#include "../lexer/token.h"
+ // You must have a token struct for source tracking
 
 // Enumerated types for different AST nodes
 typedef enum {
@@ -50,7 +51,8 @@ typedef struct ASTNode {
     struct ASTNode* statements;  // For compound blocks
     struct ASTNode* parent_expr; // Optional, used in optimizer
 
-    struct Token* token;    // Optional: useful for error reporting
+    struct Token* token;  
+    char* temp_var;  // Optional: useful for error reporting
 } ASTNode;
 
 // Constructors
@@ -60,4 +62,4 @@ ASTNode* create_binop_node(OperatorType op, ASTNode* left, ASTNode* right, struc
 ASTNode* create_assignment_node(ASTNode* identifier, ASTNode* expr, struct Token* token);
 // Add more constructors as needed
 
-#endif // AST_H
+#endif // AST_

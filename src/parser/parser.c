@@ -1,6 +1,11 @@
 #include "parser.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
+
+// Forward declarations
+static void eat(Parser* parser, TokenType token_type);
+static ASTNode* factor(Parser* parser);
 
 Parser* create_parser(Lexer* lexer) {
     Parser* parser = (Parser*)malloc(sizeof(Parser));
@@ -11,27 +16,24 @@ Parser* create_parser(Lexer* lexer) {
 
 static void eat(Parser* parser, TokenType token_type) {
     if (parser->current_token->type == token_type) {
-        free(parser->current_token);
+        free_token(parser->current_token);
         parser->current_token = get_next_token(parser->lexer);
     } else {
-        printf("Error: Unexpected token\n");
-        exit(1);
+        printf("Parser Error: Unexpected token at line %d column %d\n", 
+            parser->current_token->line, parser->current_token->column);
+        exit(EXIT_FAILURE);
     }
 }
 
 static ASTNode* factor(Parser* parser) {
     Token* token = parser->current_token;
     if (token->type == TOKEN_NUMBER) {
-        ASTNode* node = (ASTNode*)malloc(sizeof(ASTNode));
-        node->type = AST_NUMBER;
-        node->token = token;
-        node->left = NULL;
-        node->right = NULL;
+        ASTNode* node = create_number_node(atoi(token->value), token);
         eat(parser, TOKEN_NUMBER);
         return node;
     }
-    printf("Error: Invalid factor\n");
-    exit(1);
+    printf("Parser Error: Invalid factor at line %d column %d\n", token->line, token->column);
+    exit(EXIT_FAILURE);
 }
 
 ASTNode* parse(Parser* parser) {
@@ -40,32 +42,22 @@ ASTNode* parse(Parser* parser) {
     while (parser->current_token->type == TOKEN_PLUS ||
            parser->current_token->type == TOKEN_MINUS) {
         Token* token = parser->current_token;
-        if (token->type == TOKEN_PLUS) {
-            eat(parser, TOKEN_PLUS);
-        } else if (token->type == TOKEN_MINUS) {
-            eat(parser, TOKEN_MINUS);
-        }
 
-        ASTNode* new_node = (ASTNode*)malloc(sizeof(ASTNode));
-        new_node->type = AST_BINOP;
-        new_node->token = token;
-        new_node->left = node;
-        new_node->right = factor(parser);
+        OperatorType op = (token->type == TOKEN_PLUS) ? OP_ADD : OP_SUB;
+        eat(parser, token->type);
+
+        ASTNode* right = factor(parser);
+        ASTNode* new_node = create_binop_node(op, node, right, token);
         node = new_node;
     }
 
     return node;
 }
 
-void free_ast(ASTNode* node) {
-    if (node == NULL) return;
-    free_ast(node->left);
-    free_ast(node->right);
-    free(node->token);
-    free(node);
-}
-
 void free_parser(Parser* parser) {
-    free(parser->current_token);
+    if (!parser) return;
+    if (parser->current_token) {
+        free_token(parser->current_token);
+    }
     free(parser);
 }
