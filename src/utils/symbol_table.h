@@ -3,36 +3,19 @@
 
 #include <stdbool.h>
 
-// Symbol types
-typedef enum {
-    SYMBOL_VARIABLE,
-    SYMBOL_FUNCTION
-} SymbolType;
-
-// Supported data types
-typedef enum {
-    DATA_TYPE_INT,
-    DATA_TYPE_FLOAT,
-    DATA_TYPE_VOID
-} DataType;
-
-// Symbol entry structure
 typedef struct SymbolEntry {
     char* name;
-    SymbolType symbol_type;
-    DataType data_type;
-    struct SymbolEntry* next;  // For handling hash collisions (simple linked list)
+    struct SymbolEntry* next;
 } SymbolEntry;
 
-typedef struct {
-    SymbolEntry** buckets;
-    int size;
+typedef struct SymbolTable {
+    struct SymbolTable* parent;
+    SymbolEntry* symbols;
 } SymbolTable;
 
-// Symbol table functions
-SymbolTable* create_symbol_table(int size);
-bool insert_symbol(SymbolTable* table, const char* name, SymbolType type, DataType data_type);
-SymbolEntry* lookup_symbol(SymbolTable* table, const char* name);
+SymbolTable* create_symbol_table(SymbolTable* parent);
 void free_symbol_table(SymbolTable* table);
+bool insert_symbol(SymbolTable* table, const char* name);
+bool lookup_symbol(SymbolTable* table, const char* name);
 
-#endif // SYMBOL_TABLE_H
+#endif

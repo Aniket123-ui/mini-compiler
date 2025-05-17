@@ -13,5 +13,5 @@ typedef struct {
 SemanticAnalyzer* create_semantic_analyzer(void);
 bool analyze_ast(SemanticAnalyzer* analyzer, ASTNode* node);
 void free_semantic_analyzer(SemanticAnalyzer* analyzer);
-
-#endif // SEMANTIC_ANALYZER_H
+void analyze_semantics(ASTNode* root); 
+#endif

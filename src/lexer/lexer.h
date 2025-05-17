@@ -17,4 +17,5 @@ void free_lexer(Lexer* lexer);
 
 Token* create_token(TokenType type, const char* value, int line, int column);
 
+
 #endif // LEXER_H

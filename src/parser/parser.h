@@ -10,8 +10,7 @@ typedef struct {
 } Parser;
 
 Parser* create_parser(Lexer* lexer);
-ASTNode* parse(Parser* parser);
+ASTNode* parse(Parser* parser); // Parses an entire program/block
 void free_parser(Parser* parser);
-void free_ast(ASTNode* node);
 
-#endif // PARSER_H
+#endif
