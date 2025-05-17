@@ -17,4 +17,4 @@ void free_asm_generator(AsmGenerator* generator);
 // Main code generation function
 void generate_assembly(AsmGenerator* generator, ASTNode* ast);
 
-#endif
+#endif // ASM_GENERATOR_H

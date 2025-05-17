@@ -1,178 +1,247 @@
 #include "parser.h"
+#include "ast.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#ifdef _WIN32
+#define strdup _strdup
+#endif
 
-static void eat(Parser* parser, TokenType expected) {
-    if (parser->current_token->type == expected) {
-        free_token(parser->current_token);
-        parser->current_token = get_next_token(parser->lexer);
-    } else {
-        printf("Parser Error: Expected token %d but got %d at line %d column %d\n",
-            expected, parser->current_token->type,
-            parser->current_token->line, parser->current_token->column);
-        exit(1);
-    }
-}
-
-Parser* create_parser(Lexer* lexer) {
-    Parser* parser = malloc(sizeof(Parser));
-    parser->lexer = lexer;
-    parser->current_token = get_next_token(lexer);
-    return parser;
+static void advance(Parser* parser) {
+    parser->current_token = lexer_next_token(parser->lexer);
 }
 
 // Forward declarations
 static ASTNode* parse_expression(Parser* parser);
+static ASTNode* parse_term(Parser* parser);
+static ASTNode* parse_factor(Parser* parser);
+static ASTNode* parse_declaration(Parser* parser);
+static ASTNode* parse_assignment(Parser* parser);
 static ASTNode* parse_statement(Parser* parser);
 static ASTNode* parse_block(Parser* parser);
 
+// Use the exact create_*_node signatures from ast.c
+// All create_*_node functions accept token argument if needed, or just name + ASTNode*
+
+// --- Parser functions ---
+
+Parser* create_parser(Lexer* lexer) {
+    Parser* parser = malloc(sizeof(Parser));
+    if (!parser) return NULL;
+
+    parser->lexer = lexer;
+    parser->current_token = lexer_next_token(lexer);
+    return parser;
+}
+
+void free_parser(Parser* parser) {
+    if (parser) {
+        free(parser);
+    }
+}
+
 static ASTNode* parse_factor(Parser* parser) {
     Token* tok = parser->current_token;
+    if (!tok) return NULL;
+
     if (tok->type == TOKEN_NUMBER) {
-        eat(parser, TOKEN_NUMBER);
-        return create_number_node(atoi(tok->value), tok);
+        int value = atoi(tok->value);
+        advance(parser);
+        return create_number_node(value, tok);
     } else if (tok->type == TOKEN_IDENTIFIER) {
-        eat(parser, TOKEN_IDENTIFIER);
-        return create_identifier_node(strdup(tok->value), tok);
-    } else if (tok->type == TOKEN_LPAREN) {
-        eat(parser, TOKEN_LPAREN);
+        char* name = strdup(tok->value);
+        advance(parser);
+        return create_identifier_node(name, tok);
+    } else if (tok->type == TOKEN_PUNCTUATION && strcmp(tok->value, "(") == 0) {
+        advance(parser);
         ASTNode* expr = parse_expression(parser);
-        eat(parser, TOKEN_RPAREN);
+        if (!expr) return NULL;
+        if (!parser->current_token || parser->current_token->type != TOKEN_PUNCTUATION || strcmp(parser->current_token->value, ")") != 0) {
+            fprintf(stderr, "Error: Expected ')'\n");
+            free_ast(expr);
+            return NULL;
+        }
+        advance(parser);
         return expr;
-    } else {
-        printf("Parser Error: Invalid factor at line %d column %d\n", tok->line, tok->column);
-        exit(1);
     }
+
+    fprintf(stderr, "Error: Unexpected token in factor\n");
+    return NULL;
 }
 
 static ASTNode* parse_term(Parser* parser) {
     ASTNode* node = parse_factor(parser);
-    while (parser->current_token->type == TOKEN_MUL ||
-           parser->current_token->type == TOKEN_DIV) {
+    if (!node) return NULL;
+
+    while (parser->current_token &&
+           parser->current_token->type == TOKEN_OPERATOR &&
+           (strcmp(parser->current_token->value, "*") == 0 || strcmp(parser->current_token->value, "/") == 0)) {
+        BinOpType op = (strcmp(parser->current_token->value, "*") == 0) ? OP_MUL : OP_DIV;
         Token* tok = parser->current_token;
-        OperatorType op = (tok->type == TOKEN_MUL) ? OP_MUL : OP_DIV;
-        eat(parser, tok->type);
-        node = create_binop_node(op, node, parse_factor(parser), tok);
+        advance(parser);
+        ASTNode* right = parse_factor(parser);
+        if (!right) {
+            free_ast(node);
+            return NULL;
+        }
+        node = create_binop_node(op, node, right, tok);
     }
     return node;
 }
 
 static ASTNode* parse_expression(Parser* parser) {
     ASTNode* node = parse_term(parser);
-    while (parser->current_token->type == TOKEN_PLUS ||
-           parser->current_token->type == TOKEN_MINUS) {
+    if (!node) return NULL;
+
+    while (parser->current_token &&
+           parser->current_token->type == TOKEN_OPERATOR &&
+           (strcmp(parser->current_token->value, "+") == 0 || strcmp(parser->current_token->value, "-") == 0)) {
+        BinOpType op = (strcmp(parser->current_token->value, "+") == 0) ? OP_ADD : OP_SUB;
         Token* tok = parser->current_token;
-        OperatorType op = (tok->type == TOKEN_PLUS) ? OP_ADD : OP_SUB;
-        eat(parser, tok->type);
-        node = create_binop_node(op, node, parse_term(parser), tok);
+        advance(parser);
+        ASTNode* right = parse_term(parser);
+        if (!right) {
+            free_ast(node);
+            return NULL;
+        }
+        node = create_binop_node(op, node, right, tok);
     }
     return node;
 }
 
 static ASTNode* parse_declaration(Parser* parser) {
-    eat(parser, TOKEN_INT); // consume 'int'
-    Token* id_tok = parser->current_token;
-    if (id_tok->type != TOKEN_IDENTIFIER) {
-        printf("Parser Error: Expected identifier after 'int' at line %d\n", id_tok->line);
-        exit(1);
+    if (parser->current_token->type != TOKEN_IDENTIFIER) {
+        fprintf(stderr, "Expected identifier in declaration\n");
+        return NULL;
     }
-    char* name = strdup(id_tok->value);
-    eat(parser, TOKEN_IDENTIFIER);
+    char* name = strdup(parser->current_token->value);
+    Token* tok = parser->current_token;
+    advance(parser);
 
-    ASTNode* expr = NULL;
-    if (parser->current_token->type == TOKEN_ASSIGN) {
-        eat(parser, TOKEN_ASSIGN);
-        expr = parse_expression(parser);
+    ASTNode* init_expr = NULL;
+    if (parser->current_token && strcmp(parser->current_token->value, "=") == 0) {
+        advance(parser);
+        init_expr = parse_expression(parser);
+        if (!init_expr) {
+            free(name);
+            return NULL;
+        }
     }
-    eat(parser, TOKEN_SEMICOLON);
-    return create_declaration_node(name, expr, id_tok);
+    return create_declaration_node(name, init_expr, tok);
 }
 
 static ASTNode* parse_assignment(Parser* parser) {
-    Token* id_tok = parser->current_token;
-    ASTNode* id_node = create_identifier_node(strdup(id_tok->value), id_tok);
-    eat(parser, TOKEN_IDENTIFIER);
-
-    eat(parser, TOKEN_ASSIGN);
-    ASTNode* expr = parse_expression(parser);
-    eat(parser, TOKEN_SEMICOLON);
-    return create_assignment_node(id_node, expr, id_tok);
-}
-
-static ASTNode* parse_if_statement(Parser* parser) {
-    eat(parser, TOKEN_IF);
-    eat(parser, TOKEN_LPAREN);
-    ASTNode* cond = parse_expression(parser);
-    eat(parser, TOKEN_RPAREN);
-
-    ASTNode* then_stmt = parse_statement(parser);
-    ASTNode* else_stmt = NULL;
-
-    if (parser->current_token->type == TOKEN_ELSE) {
-        eat(parser, TOKEN_ELSE);
-        else_stmt = parse_statement(parser);
+    if (parser->current_token->type != TOKEN_IDENTIFIER) {
+        fprintf(stderr, "Expected identifier in assignment\n");
+        return NULL;
     }
+    char* name = strdup(parser->current_token->value);
+    Token* tok = parser->current_token;
+    advance(parser);
 
-    return create_if_node(cond, then_stmt, else_stmt);
-}
-
-static ASTNode* parse_while_statement(Parser* parser) {
-    eat(parser, TOKEN_WHILE);
-    eat(parser, TOKEN_LPAREN);
-    ASTNode* cond = parse_expression(parser);
-    eat(parser, TOKEN_RPAREN);
-
-    ASTNode* body = parse_statement(parser);
-    return create_while_node(cond, body);
-}
-
-static ASTNode* parse_return_statement(Parser* parser) {
-    eat(parser, TOKEN_RETURN);
-    ASTNode* expr = parse_expression(parser);
-    eat(parser, TOKEN_SEMICOLON);
-    return create_return_node(expr);
-}
-
-static ASTNode* parse_block(Parser* parser) {
-    eat(parser, TOKEN_LBRACE);
-    ASTNode* block = create_compound_node();
-
-    while (parser->current_token->type != TOKEN_RBRACE) {
-        ASTNode* stmt = parse_statement(parser);
-        add_statement_to_block(block, stmt);
+    if (!parser->current_token || strcmp(parser->current_token->value, "=") != 0) {
+        fprintf(stderr, "Expected '=' in assignment\n");
+        free(name);
+        return NULL;
     }
-
-    eat(parser, TOKEN_RBRACE);
-    return block;
+    advance(parser);
+    ASTNode* expr = parse_expression(parser);
+    if (!expr) {
+        free(name);
+        return NULL;
+    }
+    return create_assignment_node(create_identifier_node(name, tok), expr, tok);
 }
 
 static ASTNode* parse_statement(Parser* parser) {
-    switch (parser->current_token->type) {
-        case TOKEN_INT:
-            return parse_declaration(parser);
-        case TOKEN_IDENTIFIER:
+    if (!parser->current_token) return NULL;
+
+    if (strcmp(parser->current_token->value, "{") == 0) {
+        return parse_block(parser);
+    } else if (parser->current_token->type == TOKEN_IDENTIFIER) {
+        Token* next = lexer_peek_token(parser->lexer);
+        if (next && strcmp(next->value, "=") == 0) {
             return parse_assignment(parser);
-        case TOKEN_IF:
-            return parse_if_statement(parser);
-        case TOKEN_WHILE:
-            return parse_while_statement(parser);
-        case TOKEN_RETURN:
-            return parse_return_statement(parser);
-        case TOKEN_LBRACE:
-            return parse_block(parser);
-        default:
-            printf("Parser Error: Unexpected token %d at line %d\n", 
-                   parser->current_token->type, parser->current_token->line);
-            exit(1);
+        } else {
+            return parse_declaration(parser);
+        }
+    } else {
+        return parse_expression(parser);
     }
 }
 
-ASTNode* parse(Parser* parser) {
-    return parse_block(parser);
+static ASTNode* parse_block(Parser* parser) {
+    if (!parser->current_token || strcmp(parser->current_token->value, "{") != 0) {
+        fprintf(stderr, "Expected '{' to start block\n");
+        return NULL;
+    }
+    advance(parser);
+
+    ASTNode** statements = NULL;
+    size_t capacity = 4;
+    size_t count = 0;
+    statements = malloc(sizeof(ASTNode*) * capacity);
+
+    while (parser->current_token && strcmp(parser->current_token->value, "}") != 0) {
+        ASTNode* stmt = parse_statement(parser);
+        if (!stmt) {
+            for (size_t i = 0; i < count; ++i) free_ast(statements[i]);
+            free(statements);
+            return NULL;
+        }
+        if (count >= capacity) {
+            capacity *= 2;
+            ASTNode** new_stmts = realloc(statements, sizeof(ASTNode*) * capacity);
+            if (!new_stmts) {
+                for (size_t i = 0; i < count; ++i) free_ast(statements[i]);
+                free(statements);
+                return NULL;
+            }
+            statements = new_stmts;
+        }
+        statements[count++] = stmt;
+    }
+
+    if (!parser->current_token || strcmp(parser->current_token->value, "}") != 0) {
+        fprintf(stderr, "Expected '}' to close block\n");
+        for (size_t i = 0; i < count; ++i) free_ast(statements[i]);
+        free(statements);
+        return NULL;
+    }
+    advance(parser);
+
+    ASTNode* compound = create_compound_node(statements, count);
+    // compound node owns statements now, so free array only
+    free(statements);
+    return compound;
 }
 
-void free_parser(Parser* parser) {
-    free_token(parser->current_token);
-    free(parser);
+ASTNode* parse(Parser* parser) {
+    ASTNode** statements = NULL;
+    size_t capacity = 4, count = 0;
+    statements = malloc(sizeof(ASTNode*) * capacity);
+
+    while (parser->current_token) {
+        ASTNode* stmt = parse_statement(parser);
+        if (!stmt) {
+            for (size_t i = 0; i < count; ++i) free_ast(statements[i]);
+            free(statements);
+            return NULL;
+        }
+        if (count >= capacity) {
+            capacity *= 2;
+            ASTNode** new_stmts = realloc(statements, sizeof(ASTNode*) * capacity);
+            if (!new_stmts) {
+                for (size_t i = 0; i < count; ++i) free_ast(statements[i]);
+                free(statements);
+                return NULL;
+            }
+            statements = new_stmts;
+        }
+        statements[count++] = stmt;
+    }
+
+    ASTNode* compound = create_compound_node(statements, count);
+    free(statements);
+    return compound;
 }

@@ -3,9 +3,11 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
-
+#ifdef _WIN32
+#define strdup _strdup
+#endif
 #ifndef HAVE_STRNDUP
-// Provide strndup if not available (especially on Windows)
+// Provide strndup if not available
 char* strndup(const char* s, size_t n) {
     size_t len = strlen(s);
     if (len > n) len = n;
@@ -45,10 +47,20 @@ void skip_whitespace(Lexer* lexer) {
 Token* create_token(TokenType type, const char* value, int line, int column) {
     Token* token = malloc(sizeof(Token));
     token->type = type;
-    token->value = strdup(value); // dynamically duplicate string
+    token->value = strdup(value);
     token->line = line;
     token->column = column;
     return token;
+}
+
+// Helper to check if string is a keyword
+TokenType check_keyword(const char* str) {
+    if (strcmp(str, "if") == 0) return TOKEN_IF;
+    if (strcmp(str, "else") == 0) return TOKEN_ELSE;
+    if (strcmp(str, "while") == 0) return TOKEN_WHILE;
+    if (strcmp(str, "return") == 0) return TOKEN_RETURN;
+    if (strcmp(str, "int") == 0) return TOKEN_INT;
+    return TOKEN_IDENTIFIER;
 }
 
 Token* get_next_token(Lexer* lexer) {
@@ -56,6 +68,10 @@ Token* get_next_token(Lexer* lexer) {
     char current = lexer->input[lexer->position];
     int line = lexer->line;
     int col = lexer->column;
+
+    if (current == '\0') {
+        return create_token(TOKEN_EOF, "", line, col);
+    }
 
     if (isdigit(current)) {
         int start = lexer->position;
@@ -67,17 +83,15 @@ Token* get_next_token(Lexer* lexer) {
         return create_token(TOKEN_NUMBER, value, line, col);
     }
 
-    if (isalpha(current)) {
+    if (isalpha(current) || current == '_') {
         int start = lexer->position;
-        while (isalnum(lexer->input[lexer->position])) {
+        while (isalnum(lexer->input[lexer->position]) || lexer->input[lexer->position] == '_') {
             advance(lexer);
         }
         int length = lexer->position - start;
         char* value = strndup(&lexer->input[start], length);
-        if (strcmp(value, "int") == 0) {
-            return create_token(TOKEN_INT, value, line, col);  // TOKEN_INT = 16
-        }
-        return create_token(TOKEN_IDENTIFIER, value, line, col);
+        TokenType type = check_keyword(value);
+        return create_token(type, value, line, col);
     }
 
     switch (current) {
@@ -89,14 +103,13 @@ Token* get_next_token(Lexer* lexer) {
         case ';': advance(lexer); return create_token(TOKEN_SEMICOLON, ";", line, col);
         case '(': advance(lexer); return create_token(TOKEN_LPAREN, "(", line, col);
         case ')': advance(lexer); return create_token(TOKEN_RPAREN, ")", line, col);
-        case '{': advance(lexer); return create_token(TOKEN_LBRACE, "{", line, col); // <-- NEW
-        case '}': advance(lexer); return create_token(TOKEN_RBRACE, "}", line, col); // <-- NEW
-        case '\0': return create_token(TOKEN_EOF, "", line, col);
+        case '{': advance(lexer); return create_token(TOKEN_LBRACE, "{", line, col);
+        case '}': advance(lexer); return create_token(TOKEN_RBRACE, "}", line, col);
+        case ',': advance(lexer); return create_token(TOKEN_PUNCTUATION, ",", line, col); // NEW
         default:
             advance(lexer);
             return create_token(TOKEN_ERROR, "?", line, col);
     }
-    
 }
 
 void free_token(Token* token) {
@@ -104,4 +117,47 @@ void free_token(Token* token) {
         free(token->value);
         free(token);
     }
+}
+
+void free_lexer(Lexer* lexer) {
+    if (lexer) {
+        free((void*)lexer->input);
+        free(lexer);
+    }
+}
+Lexer* create_lexer_from_file(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        perror("File open failed");
+        exit(1);
+    }
+
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    rewind(file);
+
+    char* buffer = malloc(size + 1);
+    fread(buffer, 1, size, file);
+    buffer[size] = '\0';
+    fclose(file);
+
+    return create_lexer(buffer);
+}
+
+Token* lexer_next_token(Lexer* lexer) {
+    return get_next_token(lexer);
+}
+
+Token* lexer_peek_token(Lexer* lexer) {
+    int old_pos = lexer->position;
+    int old_line = lexer->line;
+    int old_col = lexer->column;
+
+    Token* token = get_next_token(lexer);
+
+    lexer->position = old_pos;
+    lexer->line = old_line;
+    lexer->column = old_col;
+
+    return token;
 }

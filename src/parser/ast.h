@@ -1,68 +1,71 @@
 #ifndef AST_H
 #define AST_H
 
-#include <stdbool.h>
+#include <stddef.h>  // for size_t
 #include "../lexer/token.h"
-
-// Enumerated types for different AST nodes
 typedef enum {
     AST_NUMBER,
     AST_IDENTIFIER,
-    AST_BINOP,
-    AST_ASSIGNMENT,
-    AST_DECLARATION,
-    AST_IF,
-    AST_WHILE,
-    AST_FUNCTION,
-    AST_COMPOUND,
     AST_BINARY_OP,
-    AST_RETURN
+    AST_DECLARATION,
+    AST_ASSIGNMENT,
+    AST_COMPOUND
 } ASTNodeType;
 
-// Enumerated type for binary operations
 typedef enum {
     OP_ADD,
     OP_SUB,
     OP_MUL,
-    OP_DIV,
-    OP_GT,
-    OP_LT,
-    OP_GE,
-    OP_LE,
-    OP_EQ,
-    OP_NE
-} OperatorType;
+    OP_DIV
+} BinOpType;
 
-// AST Node structure
+struct Token;  // Forward declaration
+
 typedef struct ASTNode {
     ASTNodeType type;
-    OperatorType op_type;
-    int value;
-    char* name;
+    struct Token* token;
 
-    struct ASTNode* left;
-    struct ASTNode* right;
-    struct ASTNode* condition;
-    struct ASTNode* body;
-    struct ASTNode* else_stmt;
-    struct ASTNode* statements;
-    struct ASTNode* parent_expr;
+    union {
+        // For AST_NUMBER
+        int value;
 
-    struct Token* token; // Used for source mapping and error reporting
-    char* temp_var;      // Used during IR generation to hold temporary variable names
+        // For AST_IDENTIFIER
+        char* identifier;
+
+        // For AST_BINARY_OP
+        struct {
+            BinOpType op_type;
+            struct ASTNode* left;
+            struct ASTNode* right;
+        } binop;
+
+        // For AST_DECLARATION
+        struct {
+            char* name;
+            struct ASTNode* init;
+        } declaration;
+
+        // For AST_ASSIGNMENT
+        struct {
+            char* name;
+            struct ASTNode* value;
+        } assignment;
+
+        // For AST_COMPOUND
+        struct {
+            struct ASTNode** statements;
+            size_t count;
+        } compound;
+    };
 } ASTNode;
 
-// Constructors
+// Function declarations
 ASTNode* create_number_node(int value, struct Token* token);
-ASTNode* create_identifier_node(char* name, struct Token* token);
-ASTNode* create_binop_node(OperatorType op, ASTNode* left, ASTNode* right, struct Token* token);
-ASTNode* create_assignment_node(ASTNode* identifier, ASTNode* expr, struct Token* token);
-ASTNode* create_declaration_node(char* name, ASTNode* expr, struct Token* token);
-ASTNode* create_if_node(ASTNode* condition, ASTNode* then_stmt, ASTNode* else_stmt);
-ASTNode* create_while_node(ASTNode* condition, ASTNode* body);
-ASTNode* create_return_node(ASTNode* expr);
-ASTNode* create_compound_node();
-void add_statement_to_block(ASTNode* block, ASTNode* stmt); // Appends stmt to the end of block->statements
+ASTNode* create_identifier_node(const char* name, struct Token* token);
+ASTNode* create_binop_node(BinOpType op, ASTNode* left, ASTNode* right, struct Token* token);
+ASTNode* create_declaration_node(const char* name, ASTNode* init, struct Token* token);
+ASTNode* create_assignment_node(const char* name, ASTNode* value, struct Token* token);
+ASTNode* create_compound_node(ASTNode** statements, size_t count);
 void free_ast(ASTNode* node);
 
 #endif // AST_H

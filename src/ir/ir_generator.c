@@ -27,19 +27,21 @@ void generate_ir(ASTNode* node, FILE* output) {
 
         case AST_NUMBER: {
             char* temp = new_temp();
-            fprintf(output, "%s = %d\n", temp, node->value);
-            node->temp_var = temp;
+            fprintf(output, "%s = %d\n", temp, node->number.value);
+            // Store temp_var in a dedicated field if you have one; if not, you can consider adding one
+            // For now, you can keep track externally or add a temp_var pointer to ASTNode struct
+            node->temp_var = temp; // Make sure ASTNode struct has a `char *temp_var;` field
             break;
         }
 
         case AST_BINOP: {
-            generate_ir(node->left, output);
-            generate_ir(node->right, output);
+            generate_ir(node->binop.left, output);
+            generate_ir(node->binop.right, output);
 
             char* temp = new_temp();
             const char* op;
 
-            switch (node->op_type) {
+            switch (node->binop.op_type) {
                 case OP_ADD: op = "+"; break;
                 case OP_SUB: op = "-"; break;
                 case OP_MUL: op = "*"; break;
@@ -49,9 +51,9 @@ void generate_ir(ASTNode* node, FILE* output) {
 
             fprintf(output, "%s = %s %s %s\n", 
                 temp, 
-                node->left->temp_var,
+                node->binop.left->temp_var,
                 op,
-                node->right->temp_var);
+                node->binop.right->temp_var);
 
             node->temp_var = temp;
             break;
@@ -61,15 +63,15 @@ void generate_ir(ASTNode* node, FILE* output) {
             char* label_else = new_label();
             char* label_end = new_label();
 
-            generate_ir(node->condition, output);
-            fprintf(output, "if_false %s goto %s\n", node->condition->temp_var, label_else);
+            generate_ir(node->if_stmt.condition, output);
+            fprintf(output, "if_false %s goto %s\n", node->if_stmt.condition->temp_var, label_else);
 
-            generate_ir(node->body, output);  // then block
+            generate_ir(node->if_stmt.then_branch, output);  // then block
             fprintf(output, "goto %s\n", label_end);
 
             fprintf(output, "%s:\n", label_else);
-            if (node->else_stmt) {
-                generate_ir(node->else_stmt, output);
+            if (node->if_stmt.else_branch) {
+                generate_ir(node->if_stmt.else_branch, output);
             }
             fprintf(output, "%s:\n", label_end);
             break;
@@ -80,10 +82,10 @@ void generate_ir(ASTNode* node, FILE* output) {
             char* label_end = new_label();
 
             fprintf(output, "%s:\n", label_start);
-            generate_ir(node->condition, output);
-            fprintf(output, "if_false %s goto %s\n", node->condition->temp_var, label_end);
+            generate_ir(node->while_stmt.condition, output);
+            fprintf(output, "if_false %s goto %s\n", node->while_stmt.condition->temp_var, label_end);
 
-            generate_ir(node->body, output);
+            generate_ir(node->while_stmt.body, output);
             fprintf(output, "goto %s\n", label_start);
             fprintf(output, "%s:\n", label_end);
             break;

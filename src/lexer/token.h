@@ -13,18 +13,17 @@ typedef enum {
     TOKEN_SEMICOLON,
     TOKEN_LPAREN,
     TOKEN_RPAREN,
-    TOKEN_LBRACE,     // <-- Add this for '{'
-    TOKEN_RBRACE,     // <-- Add this for '}'
+    TOKEN_LBRACE,     // {
+    TOKEN_RBRACE,     // }
     TOKEN_IF,
     TOKEN_ELSE,
     TOKEN_WHILE,
     TOKEN_RETURN,
     TOKEN_INT,
-    TOKEN_ERROR
+    TOKEN_PUNCTUATION,  // ✅ Added this for punctuation like , (comma), etc.
+    TOKEN_ERROR,
+    TOKEN_OPERATOR
 } TokenType;
-
-
-
 
 typedef struct Token {
     TokenType type;
@@ -33,7 +32,6 @@ typedef struct Token {
     int column;    // column number in source code
 } Token;
 
-// Add this declaration:
 void free_token(Token* token);
 
 #endif // TOKEN_H

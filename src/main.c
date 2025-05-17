@@ -1,61 +1,44 @@
+#include <stdio.h>
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "semantic/semantic_analyzer.h"
-#include "ir/optimizer.h"
-#include "ir/ir_generator.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include "parser/ast.h"
+// For analyze_semantics
 
-int main() {
-    FILE* input_file = fopen("input.txt", "r");
-    if (!input_file) {
-        fprintf(stderr, "Error: Could not open input.txt\n");
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <input_file>\n", argv[0]);
         return 1;
     }
 
-    // Read entire file into string
-    fseek(input_file, 0, SEEK_END);
-    long length = ftell(input_file);
-    fseek(input_file, 0, SEEK_SET);
-    char* source_code = malloc(length + 1);
-    fread(source_code, 1, length, input_file);
-    source_code[length] = '\0';
-    fclose(input_file);
+    Lexer* lexer = create_lexer_from_file(argv[1]);
+    if (!lexer) {
+        fprintf(stderr, "Failed to open input file.\n");
+        return 1;
+    }
 
-    // Initialize lexer and parser
-    Lexer* lexer = create_lexer(source_code);
     Parser* parser = create_parser(lexer);
-
-    // Parse the input into an AST
-    ASTNode* ast_root = parse(parser);
-
-    if (!ast_root) {
-        fprintf(stderr, "Parsing failed. AST is NULL.\n");
+    if (!parser) {
+        fprintf(stderr, "Failed to create parser.\n");
+        free_lexer(lexer);
         return 1;
     }
 
-    // Semantic Analysis
+    ASTNode* ast_root = parse(parser);
+    if (!ast_root) {
+        fprintf(stderr, "Parsing failed.\n");
+        free_parser(parser);
+        free_lexer(lexer);
+        return 1;
+    }
+
     analyze_semantics(ast_root);
 
-    // Optimization
-    optimize_ir(ast_root);
+    // TODO: Code generation here
 
-    // Intermediate Code Generation
-    FILE* ir_output = fopen("output.ir", "w");
-    if (!ir_output) {
-        fprintf(stderr, "Error: Could not open output.ir\n");
-        return 1;
-    }
-
-    generate_ir(ast_root, ir_output);
-    fclose(ir_output);
-
-    printf("Compilation successful. IR written to output.ir\n");
-
-    // Clean up
-    free(source_code);
-    free_parser(parser);
     free_ast(ast_root);
+    free_parser(parser);
+    free_lexer(lexer);
 
     return 0;
 }
