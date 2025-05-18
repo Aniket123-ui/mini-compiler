@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include "interpreter.h"
 
 Interpreter* create_interpreter(Parser* parser) {
@@ -8,14 +10,22 @@ Interpreter* create_interpreter(Parser* parser) {
 
 static int visit(ASTNode* node) {
     if (node->type == AST_NUMBER) {
-        return node->token->value;
+        return node->value;
     }
 
-    if (node->type == AST_BINOP) {
-        if (node->token->type == TOKEN_PLUS) {
-            return visit(node->left) + visit(node->right);
-        } else if (node->token->type == TOKEN_MINUS) {
-            return visit(node->left) - visit(node->right);
+    if (node->type == AST_BINARY_OP) {
+        switch (node->binop.op_type) {
+            case OP_ADD:
+                return visit(node->binop.left) + visit(node->binop.right);
+            case OP_SUB:
+                return visit(node->binop.left) - visit(node->binop.right);
+            case OP_MUL:
+                return visit(node->binop.left) * visit(node->binop.right);
+            case OP_DIV:
+                return visit(node->binop.left) / visit(node->binop.right);
+            default:
+                printf("Error: Unknown binary operator\n");
+                exit(1);
         }
     }
 

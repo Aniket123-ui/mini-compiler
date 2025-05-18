@@ -1,6 +1,7 @@
 #include "ast.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include "../lexer/token.h"
 
 #ifdef _WIN32
@@ -11,24 +12,24 @@ ASTNode* create_number_node(int value, Token* token) {
     ASTNode* node = malloc(sizeof(ASTNode));
     if (!node) return NULL;
     node->type = AST_NUMBER;
-    node->number.value = value;       // Corrected access here
+    node->value = value;
     node->token = token;
     return node;
 }
 
-ASTNode* create_identifier_node(char* name, Token* token) {
+ASTNode* create_identifier_node(const char* name, Token* token) {
     ASTNode* node = malloc(sizeof(ASTNode));
     if (!node) return NULL;
     node->type = AST_IDENTIFIER;
-    node->identifier.name = strdup(name);  // strdup for name duplication
+    node->identifier = strdup(name);
     node->token = token;
     return node;
 }
 
-ASTNode* create_binop_node(OperatorType op, ASTNode* left, ASTNode* right, Token* token) {
+ASTNode* create_binop_node(BinOpType op, ASTNode* left, ASTNode* right, Token* token) {
     ASTNode* node = malloc(sizeof(ASTNode));
     if (!node) return NULL;
-    node->type = AST_BINOP;
+    node->type = AST_BINARY_OP;
     node->binop.op_type = op;
     node->binop.left = left;
     node->binop.right = right;
@@ -36,33 +37,54 @@ ASTNode* create_binop_node(OperatorType op, ASTNode* left, ASTNode* right, Token
     return node;
 }
 
-ASTNode* create_declaration_node(char* name, ASTNode* init, Token* token) {
+ASTNode* create_declaration_node(const char* name, ASTNode* init, Token* token) {
     ASTNode* node = malloc(sizeof(ASTNode));
     if (!node) return NULL;
     node->type = AST_DECLARATION;
-    node->declaration.name = strdup(name);  // strdup to duplicate string
+    node->declaration.name = strdup(name);
     node->declaration.init = init;
     node->token = token;
     return node;
 }
 
-ASTNode* create_assignment_node(ASTNode* identifier, ASTNode* value, Token* token) {
+ASTNode* create_assignment_node(const char* name, ASTNode* value, Token* token) {
     ASTNode* node = malloc(sizeof(ASTNode));
     if (!node) return NULL;
     node->type = AST_ASSIGNMENT;
-    node->assignment.identifier = identifier;
+    node->assignment.name = strdup(name);
     node->assignment.value = value;
     node->token = token;
     return node;
 }
 
-ASTNode* create_compound_node() {
+ASTNode* create_compound_node(ASTNode** statements, size_t count) {
     ASTNode* node = malloc(sizeof(ASTNode));
     if (!node) return NULL;
     node->type = AST_COMPOUND;
-    node->compound.statements = NULL;
-    node->compound.count = 0;
+    node->compound.statements = statements;
+    node->compound.count = count;
     node->token = NULL;
+    return node;
+}
+
+ASTNode* create_if_node(ASTNode* condition, ASTNode* then_branch, ASTNode* else_branch, Token* token) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    if (!node) return NULL;
+    node->type = AST_IF;
+    node->if_stmt.condition = condition;
+    node->if_stmt.then_branch = then_branch;
+    node->if_stmt.else_branch = else_branch;
+    node->token = token;
+    return node;
+}
+
+ASTNode* create_while_node(ASTNode* condition, ASTNode* body, Token* token) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    if (!node) return NULL;
+    node->type = AST_WHILE;
+    node->while_stmt.condition = condition;
+    node->while_stmt.body = body;
+    node->token = token;
     return node;
 }
 
@@ -71,38 +93,87 @@ void free_ast(ASTNode* node) {
 
     switch (node->type) {
         case AST_IDENTIFIER:
-            free(node->identifier.name);
+            free(node->identifier);
             break;
-
-        case AST_BINOP:
+        case AST_BINARY_OP:
             free_ast(node->binop.left);
             free_ast(node->binop.right);
             break;
-
         case AST_DECLARATION:
             free(node->declaration.name);
             if (node->declaration.init)
                 free_ast(node->declaration.init);
             break;
-
         case AST_ASSIGNMENT:
-            free_ast(node->assignment.identifier);
+            free(node->assignment.name);
             free_ast(node->assignment.value);
             break;
-
         case AST_COMPOUND:
             for (size_t i = 0; i < node->compound.count; ++i)
                 free_ast(node->compound.statements[i]);
             free(node->compound.statements);
             break;
-
         case AST_NUMBER:
             // No dynamic memory to free
             break;
-
         default:
             break;
     }
-
     free(node);
+}
+
+void print_ast(ASTNode* node, int indent) {
+    if (!node) {
+        fprintf(stderr, "%*sNULL\n", indent, "");
+        return;
+    }
+    fprintf(stderr, "%*sNode type: %d\n", indent, "", node->type);
+    switch (node->type) {
+        case AST_NUMBER:
+            fprintf(stderr, "%*sNUMBER: %d\n", indent+2, "", node->value);
+            break;
+        case AST_IDENTIFIER:
+            fprintf(stderr, "%*sIDENTIFIER: %s\n", indent+2, "", node->identifier);
+            break;
+        case AST_BINARY_OP:
+            fprintf(stderr, "%*sBINARY_OP\n", indent+2, "");
+            print_ast(node->binop.left, indent+4);
+            print_ast(node->binop.right, indent+4);
+            break;
+        case AST_ASSIGNMENT:
+            fprintf(stderr, "%*sASSIGNMENT: %s\n", indent+2, "", node->assignment.name);
+            print_ast(node->assignment.value, indent+4);
+            break;
+        case AST_DECLARATION:
+            fprintf(stderr, "%*sDECLARATION: %s\n", indent+2, "", node->declaration.name);
+            print_ast(node->declaration.init, indent+4);
+            break;
+        case AST_COMPOUND:
+            fprintf(stderr, "%*sCOMPOUND (%zu statements)\n", indent+2, "", node->compound.count);
+            for (size_t i = 0; i < node->compound.count; ++i) {
+                print_ast(node->compound.statements[i], indent+4);
+            }
+            break;
+        case AST_IF:
+            fprintf(stderr, "%*sIF_STATEMENT\n", indent+2, "");
+            fprintf(stderr, "%*sCONDITION:\n", indent+4, "");
+            print_ast(node->if_stmt.condition, indent+6);
+            fprintf(stderr, "%*sTHEN_BRANCH:\n", indent+4, "");
+            print_ast(node->if_stmt.then_branch, indent+6);
+            if (node->if_stmt.else_branch) {
+                fprintf(stderr, "%*sELSE_BRANCH:\n", indent+4, "");
+                print_ast(node->if_stmt.else_branch, indent+6);
+            }
+            break;
+        case AST_WHILE:
+            fprintf(stderr, "%*sWHILE_STATEMENT\n", indent+2, "");
+            fprintf(stderr, "%*sCONDITION:\n", indent+4, "");
+            print_ast(node->while_stmt.condition, indent+6);
+            fprintf(stderr, "%*sBODY:\n", indent+4, "");
+            print_ast(node->while_stmt.body, indent+6);
+            break;
+        default:
+            fprintf(stderr, "%*sUNKNOWN TYPE: %d\n", indent+2, "", node->type);
+            break;
+    }
 }

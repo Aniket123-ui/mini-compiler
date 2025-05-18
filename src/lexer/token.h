@@ -22,7 +22,13 @@ typedef enum {
     TOKEN_INT,
     TOKEN_PUNCTUATION,  // ✅ Added this for punctuation like , (comma), etc.
     TOKEN_ERROR,
-    TOKEN_OPERATOR
+    TOKEN_OPERATOR,
+    TOKEN_LT,      // <
+    TOKEN_GT,      // >
+    TOKEN_LE,      // <=
+    TOKEN_GE,      // >=
+    TOKEN_EQ,      // ==
+    TOKEN_NEQ     // !=
 } TokenType;
 
 typedef struct Token {

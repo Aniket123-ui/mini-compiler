@@ -6,6 +6,7 @@
 
 
 void analyze_semantics(ASTNode* root);
+int get_semantic_error();
 
 
 typedef struct {

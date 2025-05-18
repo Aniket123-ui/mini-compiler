@@ -8,8 +8,6 @@ extern "C" {
 #include "../parser/ast.h"   // Use ast.h because generate_ir works on ASTNode*
 #include <stdio.h>
 
-char* new_temp();
-char* new_label();
 void generate_ir(ASTNode* node, FILE* output);
 
 #ifdef __cplusplus

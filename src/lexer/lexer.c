@@ -3,11 +3,12 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
+
 #ifdef _WIN32
 #define strdup _strdup
 #endif
+
 #ifndef HAVE_STRNDUP
-// Provide strndup if not available
 char* strndup(const char* s, size_t n) {
     size_t len = strlen(s);
     if (len > n) len = n;
@@ -53,7 +54,6 @@ Token* create_token(TokenType type, const char* value, int line, int column) {
     return token;
 }
 
-// Helper to check if string is a keyword
 TokenType check_keyword(const char* str) {
     if (strcmp(str, "if") == 0) return TOKEN_IF;
     if (strcmp(str, "else") == 0) return TOKEN_ELSE;
@@ -94,21 +94,58 @@ Token* get_next_token(Lexer* lexer) {
         return create_token(type, value, line, col);
     }
 
+    if (current == '<') {
+        advance(lexer);
+        if (lexer->input[lexer->position] == '=') {
+            advance(lexer);
+            return create_token(TOKEN_LE, "<=", line, col);
+        }
+        return create_token(TOKEN_LT, "<", line, col);
+    }
+
+    if (current == '>') {
+        advance(lexer);
+        if (lexer->input[lexer->position] == '=') {
+            advance(lexer);
+            return create_token(TOKEN_GE, ">=", line, col);
+        }
+        return create_token(TOKEN_GT, ">", line, col);
+    }
+
+    if (current == '=') {
+        advance(lexer);
+        if (lexer->input[lexer->position] == '=') {
+            advance(lexer);
+            return create_token(TOKEN_EQ, "==", line, col);
+        }
+        return create_token(TOKEN_ASSIGN, "=", line, col);
+    }
+
+    if (current == '!') {
+        advance(lexer);
+        if (lexer->input[lexer->position] == '=') {
+            advance(lexer);
+            return create_token(TOKEN_NEQ, "!=", line, col);
+        }
+        return create_token(TOKEN_ERROR, "!", line, col);
+    }
+
     switch (current) {
         case '+': advance(lexer); return create_token(TOKEN_PLUS, "+", line, col);
         case '-': advance(lexer); return create_token(TOKEN_MINUS, "-", line, col);
         case '*': advance(lexer); return create_token(TOKEN_MUL, "*", line, col);
         case '/': advance(lexer); return create_token(TOKEN_DIV, "/", line, col);
-        case '=': advance(lexer); return create_token(TOKEN_ASSIGN, "=", line, col);
         case ';': advance(lexer); return create_token(TOKEN_SEMICOLON, ";", line, col);
         case '(': advance(lexer); return create_token(TOKEN_LPAREN, "(", line, col);
         case ')': advance(lexer); return create_token(TOKEN_RPAREN, ")", line, col);
         case '{': advance(lexer); return create_token(TOKEN_LBRACE, "{", line, col);
         case '}': advance(lexer); return create_token(TOKEN_RBRACE, "}", line, col);
-        case ',': advance(lexer); return create_token(TOKEN_PUNCTUATION, ",", line, col); // NEW
-        default:
+        case ',': advance(lexer); return create_token(TOKEN_PUNCTUATION, ",", line, col);
+        default: {
+            char unknown[2] = { current, '\0' };
             advance(lexer);
-            return create_token(TOKEN_ERROR, "?", line, col);
+            return create_token(TOKEN_ERROR, unknown, line, col);
+        }
     }
 }
 
@@ -125,6 +162,7 @@ void free_lexer(Lexer* lexer) {
         free(lexer);
     }
 }
+
 Lexer* create_lexer_from_file(const char* filename) {
     FILE* file = fopen(filename, "r");
     if (!file) {
@@ -140,6 +178,15 @@ Lexer* create_lexer_from_file(const char* filename) {
     fread(buffer, 1, size, file);
     buffer[size] = '\0';
     fclose(file);
+
+    // Skip UTF-8 BOM if present
+    if ((unsigned char)buffer[0] == 0xEF &&
+        (unsigned char)buffer[1] == 0xBB &&
+        (unsigned char)buffer[2] == 0xBF) {
+        Lexer* lexer = create_lexer(buffer + 3);
+        free(buffer);
+        return lexer;
+    }
 
     return create_lexer(buffer);
 }

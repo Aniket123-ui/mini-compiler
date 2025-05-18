@@ -9,14 +9,22 @@ typedef enum {
     AST_BINARY_OP,
     AST_DECLARATION,
     AST_ASSIGNMENT,
-    AST_COMPOUND
+    AST_COMPOUND,
+    AST_IF,         // Add for if statement
+    AST_WHILE       // Add for while loop
 } ASTNodeType;
 
 typedef enum {
     OP_ADD,
     OP_SUB,
     OP_MUL,
-    OP_DIV
+    OP_DIV,
+    OP_LT,   // <
+    OP_GT,   // >
+    OP_LE,   // <=
+    OP_GE,   // >=
+    OP_EQ,   // ==
+    OP_NEQ   // !=
 } BinOpType;
 
 struct Token;  // Forward declaration
@@ -56,6 +64,19 @@ typedef struct ASTNode {
             struct ASTNode** statements;
             size_t count;
         } compound;
+
+        // For AST_IF
+        struct {
+            struct ASTNode* condition;
+            struct ASTNode* then_branch;
+            struct ASTNode* else_branch;
+        } if_stmt;
+
+        // For AST_WHILE
+        struct {
+            struct ASTNode* condition;
+            struct ASTNode* body;
+        } while_stmt;
     };
 } ASTNode;
 
@@ -66,6 +87,8 @@ ASTNode* create_binop_node(BinOpType op, ASTNode* left, ASTNode* right, struct T
 ASTNode* create_declaration_node(const char* name, ASTNode* init, struct Token* token);
 ASTNode* create_assignment_node(const char* name, ASTNode* value, struct Token* token);
 ASTNode* create_compound_node(ASTNode** statements, size_t count);
+ASTNode* create_if_node(ASTNode* condition, ASTNode* then_branch, ASTNode* else_branch, struct Token* token);
+ASTNode* create_while_node(ASTNode* condition, ASTNode* body, struct Token* token);
 void free_ast(ASTNode* node);
 
 #endif // AST_H
