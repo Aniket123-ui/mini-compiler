@@ -1,47 +1,33 @@
 section .data
-    x dq 10
-    y dq 5
-    z dq 0
-    fmt db 'Result: %lld', 10, 0
-
+__return_value dq 0
+fmt db 'Result: %lld', 10, 0
+b dq 0
+a dq 0
 section .text
-    global main
-    extern printf
-
+global main
+extern printf
 main:
-    ; if (x > y)
-    mov rax, [rel x]
-    mov rbx, [rel y]
-    cmp rax, rbx
-    jle .else_branch
-    ; z = x - y
-    mov rax, [rel x]
-    sub rax, [rel y]
-    mov [rel z], rax
-    jmp .after_if
-.else_branch:
-    ; z = y - x
-    mov rax, [rel y]
-    sub rax, [rel x]
-    mov [rel z], rax
-.after_if:
-
-    ; while (z < 20)
-.while_start:
-    mov rax, [rel z]
-    cmp rax, 20
-    jge .while_end
-    ; z = z + 1
-    mov rax, [rel z]
-    add rax, 1
-    mov [rel z], rax
-    jmp .while_start
-.while_end:
-
-    ; Print z using printf("Result: %lld\n", z)
-    sub rsp, 40                ; 32 for shadow space + 8 for alignment
-    mov rdx, [rel z]           ; 2nd arg: z (in rdx)
-    lea rcx, [rel fmt]         ; 1st arg: format string (in rcx)
+    push rbp
+    mov rbp, rsp
+    sub rsp, 16
+    ; declare a
+    mov rax, 5
+    mov [rel a], rax
+    ; declare b
+    mov rax, 3
+    mov [rel b], rax
+    mov rax, [rel a]
+    push rax
+    mov rax, [rel b]
+    mov rbx, rax
+    pop rax
+    add rax, rbx
+    mov [rel __return_value], rax
+    mov rdx, qword [rel __return_value]
+    lea rcx, [rel fmt]
     call printf
-    add rsp, 40
+    pop rbp
+    mov rdx, qword [rel __return_value]
+    lea rcx, [rel fmt]
+    call printf
     ret

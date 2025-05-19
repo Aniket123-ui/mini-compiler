@@ -69,20 +69,21 @@ Token* get_next_token(Lexer* lexer) {
     int line = lexer->line;
     int col = lexer->column;
 
+    // Robust EOF check: if at end, return EOF immediately
     if (current == '\0') {
         return create_token(TOKEN_EOF, "", line, col);
     }
 
-    if (isdigit(current)) {
-        int start = lexer->position;
-        while (isdigit(lexer->input[lexer->position])) {
-            advance(lexer);
-        }
-        int length = lexer->position - start;
-        char* value = strndup(&lexer->input[start], length);
-        return create_token(TOKEN_NUMBER, value, line, col);
+    // Skip any non-ASCII or non-printable characters
+    while (current != '\0' && ((unsigned char)current > 127 || (current < 32 && current != '\n' && current != '\t'))) {
+        advance(lexer);
+        current = lexer->input[lexer->position];
+    }
+    if (current == '\0') {
+        return create_token(TOKEN_EOF, "", line, col);
     }
 
+    // Identifiers and keywords
     if (isalpha(current) || current == '_') {
         int start = lexer->position;
         while (isalnum(lexer->input[lexer->position]) || lexer->input[lexer->position] == '_') {
@@ -94,24 +95,18 @@ Token* get_next_token(Lexer* lexer) {
         return create_token(type, value, line, col);
     }
 
-    if (current == '<') {
-        advance(lexer);
-        if (lexer->input[lexer->position] == '=') {
+    // Numbers
+    if (isdigit(current)) {
+        int start = lexer->position;
+        while (isdigit(lexer->input[lexer->position])) {
             advance(lexer);
-            return create_token(TOKEN_LE, "<=", line, col);
         }
-        return create_token(TOKEN_LT, "<", line, col);
+        int length = lexer->position - start;
+        char* value = strndup(&lexer->input[start], length);
+        return create_token(TOKEN_NUMBER, value, line, col);
     }
 
-    if (current == '>') {
-        advance(lexer);
-        if (lexer->input[lexer->position] == '=') {
-            advance(lexer);
-            return create_token(TOKEN_GE, ">=", line, col);
-        }
-        return create_token(TOKEN_GT, ">", line, col);
-    }
-
+    // Operators and punctuation
     if (current == '=') {
         advance(lexer);
         if (lexer->input[lexer->position] == '=') {
@@ -120,7 +115,6 @@ Token* get_next_token(Lexer* lexer) {
         }
         return create_token(TOKEN_ASSIGN, "=", line, col);
     }
-
     if (current == '!') {
         advance(lexer);
         if (lexer->input[lexer->position] == '=') {
@@ -129,7 +123,22 @@ Token* get_next_token(Lexer* lexer) {
         }
         return create_token(TOKEN_ERROR, "!", line, col);
     }
-
+    if (current == '>') {
+        advance(lexer);
+        if (lexer->input[lexer->position] == '=') {
+            advance(lexer);
+            return create_token(TOKEN_GE, ">=", line, col);
+        }
+        return create_token(TOKEN_GT, ">", line, col);
+    }
+    if (current == '<') {
+        advance(lexer);
+        if (lexer->input[lexer->position] == '=') {
+            advance(lexer);
+            return create_token(TOKEN_LE, "<=", line, col);
+        }
+        return create_token(TOKEN_LT, "<", line, col);
+    }
     switch (current) {
         case '+': advance(lexer); return create_token(TOKEN_PLUS, "+", line, col);
         case '-': advance(lexer); return create_token(TOKEN_MINUS, "-", line, col);
@@ -207,4 +216,14 @@ Token* lexer_peek_token(Lexer* lexer) {
     lexer->column = old_col;
 
     return token;
+}
+
+void print_tokens(Lexer* lexer) {
+    Token* token = NULL;
+    do {
+        token = get_next_token(lexer);
+        if (token) {
+            fprintf(stderr, "[LEXER DEBUG] Token: type=%d, value='%s'\n", token->type, token->value ? token->value : "(null)");
+        }
+    } while (token && token->type != TOKEN_EOF);
 }

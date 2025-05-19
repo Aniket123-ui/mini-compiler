@@ -2,7 +2,6 @@
 #define SYMBOL_TABLE_H
 
 #include <stdbool.h>
-
 typedef struct SymbolEntry {
     char* name;
     struct SymbolEntry* next;
@@ -12,6 +11,9 @@ typedef struct SymbolTable {
     struct SymbolTable* parent;
     SymbolEntry* symbols;
 } SymbolTable;
+
+extern SymbolTable* symbol_table;
+void add_symbol(const char* name);
 
 SymbolTable* create_symbol_table(SymbolTable* parent);
 void free_symbol_table(SymbolTable* table);

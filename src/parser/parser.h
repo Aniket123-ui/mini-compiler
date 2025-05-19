@@ -13,7 +13,7 @@ typedef struct Parser {
 Parser* create_parser(Lexer* lexer);
 
 ASTNode* parse(Parser* parser);
-
+ASTNode* parse_program(Parser* parser);
 void free_parser(Parser* parser);
 
 #endif // PARSER_H

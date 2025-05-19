@@ -60,9 +60,9 @@ ASTNode* create_assignment_node(const char* name, ASTNode* value, Token* token) 
 ASTNode* create_compound_node(ASTNode** statements, size_t count) {
     ASTNode* node = malloc(sizeof(ASTNode));
     if (!node) return NULL;
-    node->type = AST_COMPOUND;
-    node->compound.statements = statements;
-    node->compound.count = count;
+    node->type = AST_BLOCK;
+    node->block.statements = statements;
+    node->block.count = count;
     node->token = NULL;
     return node;
 }
@@ -88,10 +88,39 @@ ASTNode* create_while_node(ASTNode* condition, ASTNode* body, Token* token) {
     return node;
 }
 
+ASTNode* create_function_node(const char* name, ASTNode* body, Token* token) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    if (!node) return NULL;
+    node->type = AST_FUNCTION;
+    node->function.name = strdup(name);
+    node->function.body = body;
+    node->token = token;
+    return node;
+}
+
+ASTNode* create_return_node(ASTNode* expr, Token* token) {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    if (!node) return NULL;
+    node->type = AST_RETURN;
+    node->return_stmt.expr = expr;
+    node->token = token;
+    return node;
+}
+
 void free_ast(ASTNode* node) {
     if (!node) return;
 
     switch (node->type) {
+        case AST_BLOCK:
+            for (size_t i = 0; i < node->block.count; ++i)
+                free_ast(node->block.statements[i]);
+            free(node->block.statements);
+            break;
+        case AST_COMPOUND:
+            for (size_t i = 0; i < node->block.count; ++i)
+                free_ast(node->block.statements[i]);
+            free(node->block.statements);
+            break;
         case AST_IDENTIFIER:
             free(node->identifier);
             break;
@@ -108,13 +137,15 @@ void free_ast(ASTNode* node) {
             free(node->assignment.name);
             free_ast(node->assignment.value);
             break;
-        case AST_COMPOUND:
-            for (size_t i = 0; i < node->compound.count; ++i)
-                free_ast(node->compound.statements[i]);
-            free(node->compound.statements);
-            break;
         case AST_NUMBER:
             // No dynamic memory to free
+            break;
+        case AST_FUNCTION:
+            free(node->function.name);
+            free_ast(node->function.body);
+            break;
+        case AST_RETURN:
+            free_ast(node->return_stmt.expr);
             break;
         default:
             break;
@@ -149,9 +180,9 @@ void print_ast(ASTNode* node, int indent) {
             print_ast(node->declaration.init, indent+4);
             break;
         case AST_COMPOUND:
-            fprintf(stderr, "%*sCOMPOUND (%zu statements)\n", indent+2, "", node->compound.count);
-            for (size_t i = 0; i < node->compound.count; ++i) {
-                print_ast(node->compound.statements[i], indent+4);
+            fprintf(stderr, "%*sCOMPOUND (%zu statements)\n", indent+2, "", node->block.count);
+            for (size_t i = 0; i < node->block.count; ++i) {
+                print_ast(node->block.statements[i], indent+4);
             }
             break;
         case AST_IF:
@@ -171,6 +202,18 @@ void print_ast(ASTNode* node, int indent) {
             print_ast(node->while_stmt.condition, indent+6);
             fprintf(stderr, "%*sBODY:\n", indent+4, "");
             print_ast(node->while_stmt.body, indent+6);
+            break;
+        case AST_FUNCTION:
+            fprintf(stderr, "%*sFUNCTION: %s\n", indent+2, "", node->function.name);
+            fprintf(stderr, "%*sBODY:\n", indent+4, "");
+            print_ast(node->function.body, indent+6);
+            break;
+        case AST_RETURN:
+            fprintf(stderr, "%*sRETURN_STATEMENT\n", indent+2, "");
+            if (node->return_stmt.expr) {
+                fprintf(stderr, "%*sEXPRESSION:\n", indent+4, "");
+                print_ast(node->return_stmt.expr, indent+6);
+            }
             break;
         default:
             fprintf(stderr, "%*sUNKNOWN TYPE: %d\n", indent+2, "", node->type);

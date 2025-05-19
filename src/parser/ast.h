@@ -9,9 +9,12 @@ typedef enum {
     AST_BINARY_OP,
     AST_DECLARATION,
     AST_ASSIGNMENT,
-    AST_COMPOUND,
-    AST_IF,         // Add for if statement
-    AST_WHILE       // Add for while loop
+    AST_COMPOUND, // legacy, will alias to AST_BLOCK
+    AST_BLOCK,
+    AST_IF,
+    AST_WHILE,
+    AST_RETURN,
+    AST_FUNCTION
 } ASTNodeType;
 
 typedef enum {
@@ -59,11 +62,11 @@ typedef struct ASTNode {
             struct ASTNode* value;
         } assignment;
 
-        // For AST_COMPOUND
+        // For AST_BLOCK (and legacy AST_COMPOUND)
         struct {
             struct ASTNode** statements;
             size_t count;
-        } compound;
+        } block;
 
         // For AST_IF
         struct {
@@ -77,6 +80,17 @@ typedef struct ASTNode {
             struct ASTNode* condition;
             struct ASTNode* body;
         } while_stmt;
+
+        // For AST_RETURN
+        struct {
+            struct ASTNode* expr;
+        } return_stmt;
+
+        // For AST_FUNCTION
+        struct {
+            char* name;
+            struct ASTNode* body;
+        } function;
     };
 } ASTNode;
 
@@ -89,6 +103,8 @@ ASTNode* create_assignment_node(const char* name, ASTNode* value, struct Token* 
 ASTNode* create_compound_node(ASTNode** statements, size_t count);
 ASTNode* create_if_node(ASTNode* condition, ASTNode* then_branch, ASTNode* else_branch, struct Token* token);
 ASTNode* create_while_node(ASTNode* condition, ASTNode* body, struct Token* token);
+ASTNode* create_return_node(struct ASTNode* expr, struct Token* token);
+ASTNode* create_function_node(const char* name, struct ASTNode* body, struct Token* token);
 void free_ast(ASTNode* node);
 
 #endif // AST_H
